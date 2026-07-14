@@ -1,180 +1,198 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+import axios from "../axios";
 import AppContext from "../Context/Context";
-import unplugged from "../assets/unplugged.png"
+import unplugged from "../assets/unplugged.png";
 
 const Home = ({ selectedCategory }) => {
   const { data, isError, addToCart, refreshData } = useContext(AppContext);
+
   const [products, setProducts] = useState([]);
-  const [isDataFetched, setIsDataFetched] = useState(false);
 
   useEffect(() => {
-    if (!isDataFetched) {
-      refreshData();
-      setIsDataFetched(true);
-    }
-  }, [refreshData, isDataFetched]);
+    refreshData();
+  }, []);
 
   useEffect(() => {
-    if (data && data.length > 0) {
-      const fetchImagesAndUpdateProducts = async () => {
-        const updatedProducts = await Promise.all(
-          data.map(async (product) => {
-            try {
-              const response = await axios.get(
-                `http://localhost:8080/api/product/${product.id}/image`,
-                { responseType: "blob" }
-              );
-              const imageUrl = URL.createObjectURL(response.data);
-              return { ...product, imageUrl };
-            } catch (error) {
-              console.error(
-                "Error fetching image for product ID:",
-                product.id,
-                error
-              );
-              return { ...product, imageUrl: "placeholder-image-url" };
-            }
-          })
-        );
-        setProducts(updatedProducts);
-      };
+    const fetchImages = async () => {
+      if (!data || data.length === 0) {
+        setProducts([]);
+        return;
+      }
 
-      fetchImagesAndUpdateProducts();
-    }
+      const updatedProducts = await Promise.all(
+        data.map(async (product) => {
+          try {
+            const response = await axios.get(
+              `/product/${product.id}/image`,
+              {
+                responseType: "blob",
+              }
+            );
+
+            const imageUrl = URL.createObjectURL(response.data);
+
+            return {
+              ...product,
+              imageUrl,
+            };
+          } catch (err) {
+            console.error(
+              `Error loading image for product ${product.id}`,
+              err
+            );
+
+            return {
+              ...product,
+              imageUrl:
+                "https://via.placeholder.com/300x200?text=No+Image",
+            };
+          }
+        })
+      );
+
+      setProducts(updatedProducts);
+    };
+
+    fetchImages();
+
+    return () => {
+      products.forEach((product) => {
+        if (
+          product.imageUrl &&
+          product.imageUrl.startsWith("blob:")
+        ) {
+          URL.revokeObjectURL(product.imageUrl);
+        }
+      });
+    };
   }, [data]);
 
   const filteredProducts = selectedCategory
-    ? products.filter((product) => product.category === selectedCategory)
+    ? products.filter(
+        (product) =>
+          product.category.toLowerCase() ===
+          selectedCategory.toLowerCase()
+      )
     : products;
 
   if (isError) {
     return (
-      <h2 className="text-center" style={{ padding: "18rem" }}>
-      <img src={unplugged} alt="Error" style={{ width: '100px', height: '100px' }}/>
-      </h2>
+      <div
+        className="text-center"
+        style={{ padding: "8rem" }}
+      >
+        <img
+          src={unplugged}
+          alt="Error"
+          style={{ width: "120px" }}
+        />
+        <h4 className="mt-3">
+          Unable to connect to server.
+        </h4>
+      </div>
     );
   }
+
   return (
-    <>
-      <div
-        className="grid"
-        style={{
-          marginTop: "64px",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-          gap: "20px",
-          padding: "20px",
-        }}
-      >
-        {filteredProducts.length === 0 ? (
-          <h2
-            className="text-center"
+    <div
+      style={{
+        marginTop: "80px",
+        display: "grid",
+        gridTemplateColumns:
+          "repeat(auto-fit, minmax(250px,1fr))",
+        gap: "20px",
+        padding: "20px",
+      }}
+    >
+      {filteredProducts.length === 0 ? (
+        <h2
+          style={{
+            textAlign: "center",
+            width: "100%",
+          }}
+        >
+          No Products Available
+        </h2>
+      ) : (
+        filteredProducts.map((product) => (
+          <div
+            key={product.id}
+            className="card"
             style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
+              width: "250px",
+              height: "360px",
+              borderRadius: "10px",
+              overflow: "hidden",
+              boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
+              backgroundColor: product.productAvailable
+                ? "#fff"
+                : "#ddd",
             }}
           >
-            No Products Available
-          </h2>
-        ) : (
-          filteredProducts.map((product) => {
-            const { id, brand, name, price, productAvailable, imageUrl } =
-              product;
-            const cardStyle = {
-              width: "18rem",
-              height: "12rem",
-              boxShadow: "rgba(0, 0, 0, 0.24) 0px 2px 3px",
-              backgroundColor: productAvailable ? "#fff" : "#ccc",
-            };
-            return (
-              <div
-                className="card mb-3"
+            <Link
+              to={`/product/${product.id}`}
+              style={{
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <img
+                src={product.imageUrl}
+                alt={product.name}
                 style={{
-                  width: "250px",
-                  height: "360px",
-                  boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-                  borderRadius: "10px",
-                  overflow: "hidden", 
-                  backgroundColor: productAvailable ? "#fff" : "#ccc",
+                  width: "100%",
+                  height: "160px",
+                  objectFit: "cover",
+                }}
+              />
+
+              <div
+                className="card-body"
+                style={{
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent:'flex-start',
-                  alignItems:'stretch'
+                  justifyContent: "space-between",
+                  height: "200px",
                 }}
-                key={id}
               >
-                <Link
-                  to={`/product/${id}`}
-                  style={{ textDecoration: "none", color: "inherit" }}
-                >
-                  <img
-                    src={imageUrl}
-                    alt={name}
+                <div>
+                  <h5>{product.name}</h5>
+
+                  <p
                     style={{
-                      width: "100%",
-                      height: "150px", 
-                      objectFit: "cover",  
-                      padding: "5px",
-                      margin: "0",
-                      borderRadius: "10px 10px 10px 10px", 
-                    }}
-                  />
-                  <div
-                    className="card-body"
-                    style={{
-                      flexGrow: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      padding: "10px",
+                      fontStyle: "italic",
+                      color: "#555",
                     }}
                   >
-                    <div>
-                      <h5
-                        className="card-title"
-                        style={{ margin: "0 0 10px 0", fontSize: "1.2rem" }}
-                      >
-                        {name.toUpperCase()}
-                      </h5>
-                      <i
-                        className="card-brand"
-                        style={{ fontStyle: "italic", fontSize: "0.8rem" }}
-                      >
-                        {"~ " + brand}
-                      </i>
-                    </div>
-                    <hr className="hr-line" style={{ margin: "10px 0" }} />
-                    <div className="home-cart-price">
-                      <h5
-                        className="card-text"
-                        style={{ fontWeight: "600", fontSize: "1.1rem",marginBottom:'5px' }}
-                      >
-                        <i class="bi bi-currency-rupee"></i>
-                        {price}
-                      </h5>
-                    </div>
-                    <button
-                      className="btn-hover color-9"
-                      style={{margin:'10px 25px 0px '  }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        addToCart(product);
-                      }}
-                      disabled={!productAvailable}
-                    >
-                      {productAvailable ? "Add to Cart" : "Out of Stock"}
-                    </button> 
-                  </div>
-                </Link>
+                    {product.brand}
+                  </p>
+                </div>
+
+                <div>
+                  <h5>
+                    ₹ {product.price}
+                  </h5>
+
+                  <button
+                    className="btn btn-primary w-100"
+                    disabled={!product.productAvailable}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      addToCart(product);
+                    }}
+                  >
+                    {product.productAvailable
+                      ? "Add to Cart"
+                      : "Out of Stock"}
+                  </button>
+                </div>
               </div>
-            );
-          })
-        )}
-      </div>
-    </>
+            </Link>
+          </div>
+        ))
+      )}
+    </div>
   );
 };
 
